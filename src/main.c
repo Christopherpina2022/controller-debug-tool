@@ -28,49 +28,6 @@ void toBuffer (ConsoleScreen *screen, int x, int y, const char *string) {
     }
 }
 
-void renderController(ConsoleScreen *screen, XINPUT_STATE *state) {
-    WORD buttons = state->Gamepad.wButtons;
-    char tempBuffer[32];
-
-    toBuffer(screen, 0, 0, "Controller 0");
-    toBuffer(screen, 0, 1, "============");
-
-    sprintf(tempBuffer, "A: %-8s", (XINPUT_GAMEPAD_A & buttons) ? "Pressed" : "Released");
-    toBuffer(screen, 0, 3, tempBuffer);
-
-    sprintf(tempBuffer, "B: %-8s", (XINPUT_GAMEPAD_B & buttons) ? "Pressed" : "Released");
-    toBuffer(screen, 0, 4, tempBuffer);
-
-    sprintf(tempBuffer, "X: %-8s", (XINPUT_GAMEPAD_X & buttons) ? "Pressed" : "Released");
-    toBuffer(screen, 0, 5, tempBuffer);
-
-    sprintf(tempBuffer, "Y: %-8s", (XINPUT_GAMEPAD_Y & buttons) ? "Pressed" : "Released");
-    toBuffer(screen, 0, 6, tempBuffer);
-
-    sprintf(tempBuffer, "LX: %6d", (state->Gamepad.sThumbLX));
-    toBuffer(screen, 0, 8, tempBuffer);
-
-    sprintf(tempBuffer, "LY: %d", (state->Gamepad.sThumbLY));
-    toBuffer(screen, 0, 9, tempBuffer);
-}
-
-void flushBuffer(ConsoleScreen *screen) {
-    DWORD written;
-    COORD origin = {0,0};
-
-    WriteConsoleOutputCharacterA(
-        screen->console,
-        screen->buffer,
-        screen->width * screen->height,
-        origin,
-        &written
-    );
-}
-
-void clearRegion(ConsoleScreen *screen) {
-    memset(screen->buffer, ' ', screen->width * screen->height);
-}
-
 char *batteryLevel(BYTE batLevel) {
     switch (batLevel)
     {
@@ -93,6 +50,55 @@ char *batteryType(BYTE batType) {
     }
 }
 
+void renderController(ConsoleScreen *screen, XINPUT_STATE *state) {
+    XINPUT_BATTERY_INFORMATION batteryInfo;
+    WORD buttons = state->Gamepad.wButtons;
+    char tempBuffer[32];
+
+    DWORD batteryResult = XInputGetBatteryInformation(0, BATTERY_DEVTYPE_GAMEPAD, &batteryInfo);
+
+    toBuffer(screen, 0, 0, "Controller 0");
+    toBuffer(screen, 0, 1, "============");
+
+    sprintf(tempBuffer, "Battery: %s, Battery Type: %s", batteryLevel(batteryInfo.BatteryLevel), batteryType(batteryInfo.BatteryType));
+    toBuffer(screen, 0, 2, tempBuffer);
+
+    sprintf(tempBuffer, "A: %-8s", (XINPUT_GAMEPAD_A & buttons) ? "Pressed" : "Released");
+    toBuffer(screen, 0, 4, tempBuffer);
+
+    sprintf(tempBuffer, "B: %-8s", (XINPUT_GAMEPAD_B & buttons) ? "Pressed" : "Released");
+    toBuffer(screen, 0, 5, tempBuffer);
+
+    sprintf(tempBuffer, "X: %-8s", (XINPUT_GAMEPAD_X & buttons) ? "Pressed" : "Released");
+    toBuffer(screen, 0, 6, tempBuffer);
+
+    sprintf(tempBuffer, "Y: %-8s", (XINPUT_GAMEPAD_Y & buttons) ? "Pressed" : "Released");
+    toBuffer(screen, 0, 7, tempBuffer);
+
+    sprintf(tempBuffer, "LX: %6d", (state->Gamepad.sThumbLX));
+    toBuffer(screen, 0, 9, tempBuffer);
+
+    sprintf(tempBuffer, "LY: %d", (state->Gamepad.sThumbLY));
+    toBuffer(screen, 0, 10, tempBuffer);
+}
+
+void flushBuffer(ConsoleScreen *screen) {
+    DWORD written;
+    COORD origin = {0,0};
+
+    WriteConsoleOutputCharacterA(
+        screen->console,
+        screen->buffer,
+        screen->width * screen->height,
+        origin,
+        &written
+    );
+}
+
+void clearRegion(ConsoleScreen *screen) {
+    memset(screen->buffer, ' ', screen->width * screen->height);
+}
+
 void setDeadzone (float *magnitude, float *normalizedMagnitude) {
     if (*magnitude > INPUT_DEADZONE) {
         if (*magnitude > MAGNITUDE_MAX) *magnitude = MAGNITUDE_MAX;
@@ -108,7 +114,6 @@ void setDeadzone (float *magnitude, float *normalizedMagnitude) {
 int main () {
     // Initialize XInput structures
     XINPUT_STATE state;
-    XINPUT_BATTERY_INFORMATION batteryInfo;
     // Initialize console stuctures
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -148,8 +153,6 @@ int main () {
         
         if (result == ERROR_SUCCESS)
         {
-            // Collects battery info and what buttons are being pressed at that frame
-            DWORD batteryResult = XInputGetBatteryInformation(0, BATTERY_DEVTYPE_GAMEPAD, &batteryInfo);
             renderController(&screen, &state);
         }
         else {
