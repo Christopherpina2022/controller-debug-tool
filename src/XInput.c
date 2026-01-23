@@ -1,7 +1,8 @@
-#include <xinput.h>
+#include <xinput_Backend.h>
 #include <input.h>
-#include <windows.h>
 #include <math.h>
+#include <windows.h>
+#include <xinput.h>
 
 // Defined by the Microsoft Xinput Documentation page
 #define XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE 7849
@@ -79,9 +80,7 @@ static uint16_t mapButtons(WORD buttons) {
     return out;
 }
 
-int xinput_update () {
-    
-
+void xinput_update () {
     for (int i = 0; i < MAX_CONTROLLERS; i++) {
         XINPUT_STATE state;
         XINPUT_BATTERY_INFORMATION batteryInfo;

@@ -15,14 +15,6 @@ typedef struct {
     HANDLE console;
 } ConsoleScreen;
 
-typedef struct {
-    InputBackend backend;
-    int deviceID;
-    char name[128];
-    uint16_t vendorID;
-    uint16_t productID;
-} ControllerInfo;
-
 void toBuffer (ConsoleScreen *screen, int x, int y, const char *string) {
     if (y < 0 || y >= screen->height) return;
 
