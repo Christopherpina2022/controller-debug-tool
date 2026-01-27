@@ -19,6 +19,9 @@ typedef struct {
     int buttonMap[MAX_USAGES];
     int axisMap[MAX_USAGES];
 
+    uint16_t vendorID;
+    uint16_t productID;
+
     HANDLE device;
     PHIDP_PREPARSED_DATA preparsed;
     HIDP_CAPS caps;
@@ -137,6 +140,29 @@ HidRecord *devReg(HANDLE hDevice) {
     memset(newRecord, 0, sizeof(HidRecord));
     newRecord->device = hDevice;
 
+    RID_DEVICE_INFO info;
+    UINT infoSize = sizeof(info);
+    info.cbSize = sizeof(info);
+
+    // Assign vendor ID and Product ID
+    if (GetRawInputDeviceInfo(
+        hDevice,
+        RIDI_DEVICEINFO,
+        &info,
+        &infoSize
+    ) > 0 ) {
+        if (info.dwType == RIM_TYPEHID) {
+            newRecord->vendorID = info.hid.dwVendorId;
+            newRecord->productID = info.hid.dwProductId;
+        }
+    }
+
+    // clear maps
+    for (int i = 0; i < MAX_USAGES; i++) {
+        newRecord->buttonMap[i] = -1;
+        newRecord->axisMap[i]   = -1;
+    }
+
     // Get preparsed data
     UINT size = 0;
     GetRawInputDeviceInfo(hDevice, RIDI_PREPARSEDDATA, NULL, &size);
@@ -166,32 +192,46 @@ HidRecord *devReg(HANDLE hDevice) {
     }
 
     // Buttons
-    int nextButton = 0;
     for (USHORT i = 0; i < newRecord->buttonCapCount; i++) {
-        HIDP_BUTTON_CAPS *bc = &newRecord->buttonCaps[i];
+    HIDP_BUTTON_CAPS *bc = &newRecord->buttonCaps[i];
 
-        if (bc->IsRange) {
-            for (USAGE u = bc->Range.UsageMin;
-                u <= bc->Range.UsageMax && nextButton < GAMEPAD_BUTTON_COUNT;
-                u++) {
-                newRecord->buttonMap[u] = nextButton++;
-            }
-        } else {
-            if (nextButton < GAMEPAD_BUTTON_COUNT) {
-                newRecord->buttonMap[bc->NotRange.Usage] = nextButton++;
+    if (bc->UsagePage != 0x09)
+        continue;
+
+    if (bc->IsRange) {
+        for (USAGE u = bc->Range.UsageMin; u <= bc->Range.UsageMax && u < MAX_USAGES; u++) {
+            switch (u) {
+                /* Raw Input doesn't tell you what button does what, we have to
+                identify it ourselves*/
+                case 1: newRecord->buttonMap[u] = 0; break;
+                case 2: newRecord->buttonMap[u] = 1; break;
+                case 3: newRecord->buttonMap[u] = 2; break;
+                case 4: newRecord->buttonMap[u] = 3; break;
+                case 5: newRecord->buttonMap[u] = 4; break;
+                case 6: newRecord->buttonMap[u] = 5; break;
             }
         }
     }
+}
 
     // Axes
-    int nextAxis = 0;
-    for (USHORT i = 0; i < newRecord->valueCapCount &&
-                    nextAxis < GAMEPAD_MAX_AXES; i++) {
-        HIDP_VALUE_CAPS *vc = &newRecord->valueCaps[i];
-        if (!vc->IsRange) {
-            newRecord->axisMap[vc->NotRange.Usage] = nextAxis++;
-        }
+    for (USHORT i = 0; i < newRecord->valueCapCount; i++) {
+    HIDP_VALUE_CAPS *vc = &newRecord->valueCaps[i];
+
+    if (vc->UsagePage != 0x01 || vc->IsRange)
+        continue;
+
+    switch (vc->NotRange.Usage) {
+        case 0x30: newRecord->axisMap[0x30] = AXIS_LX; break; // LX
+        case 0x31: newRecord->axisMap[0x31] = AXIS_LY; break; // LY
+        case 0x32: newRecord->axisMap[0x32] = AXIS_RX; break; // RX
+        case 0x35: newRecord->axisMap[0x35] = AXIS_RY; break; // RY
+
+        // Doesn't get anything rn
+        case 0x36: newRecord->axisMap[0x36] = AXIS_RT; break; // RT
+        case 0x37: newRecord->axisMap[0x37] = AXIS_LT; break; // LT
     }
+}
 
     return newRecord;
 }
