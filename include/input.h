@@ -5,6 +5,7 @@
 #define GAMEPAD_BUTTON_COUNT 14
 #define GAMEPAD_MAX_AXES 6
 
+// right number is the assignment for when you map the buttons
 typedef enum {
     BTN_A       = 1 << 0,
     BTN_B       = 1 << 1,

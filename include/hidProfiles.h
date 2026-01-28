@@ -22,4 +22,4 @@ to map buttons and axes. We aren't considering extra features anyway.*/
 #define NINTENDO_PID_SJC_2 0x2007
 #define NINTENDO_PID_WII 0x0306
 
-void applyProfile(HidRecord *dev);
+void buildHIDMap(HidRecord *dev);

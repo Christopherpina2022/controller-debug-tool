@@ -133,15 +133,13 @@ int main () {
     input_init();
     
     while (1) {
-
-        //for now we are not running the renderer so we can map buttons
-        //clearRegion(&screen);
+        clearRegion(&screen);
 
         // We are only grabbing data on the first controller we see for now
         input_update();
         const GamepadState *padState = input_get_gamepad(0);
-        //renderController(&screen, padState);
-        //flushBuffer(&screen);
+        renderController(&screen, padState);
+        flushBuffer(&screen);
         Sleep(16);
     }
 }

@@ -82,6 +82,18 @@ void parseReport(HidRecord *dev, const BYTE *report, UINT size, int devIndex) {
         }
 
         rState.axisValue[axis] = norm;
+
+        for (USHORT i = 0; i < dev->valueCapCount; i++) {
+            HIDP_VALUE_CAPS *vc = &dev->valueCaps[i];
+
+            printf(
+                "UsagePage 0x%02X Usage 0x%02X | Logical [%ld, %ld]\n",
+                vc->UsagePage,
+                vc->NotRange.Usage,
+                vc->LogicalMin,
+                vc->LogicalMax
+            );
+        }
     }
 
     // Update frontend GamepadState directly
@@ -170,7 +182,7 @@ HidRecord *devReg(HANDLE hDevice) {
     }
 
     // Map buttons to our inputs
-    applyProfile(newRecord);
+    //applyProfile(newRecord);
 
     return newRecord;
 }
