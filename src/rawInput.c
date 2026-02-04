@@ -4,51 +4,37 @@
 #include <RawInput_Backend.h>
 #include <hidProfiles.h>
 
-typedef struct {
-    uint8_t  buttonDown[GAMEPAD_BUTTON_COUNT]; // 1 for pressed, 0 for released
-    float    axisValue[GAMEPAD_MAX_AXES];
-} RawState;
-
 static GamepadState gState[MAX_CONTROLLERS];
 static HidRecord hidRecord[MAX_CONTROLLERS];
 static int hidDevCount = 0;
 static HWND g_hwnd;
 
+static inline float applyDeadzone(float v, float dz) {
+    if (fabsf(v) < dz)
+        return 0.0f;
+
+    // Rescale so we still reach ±1
+    if (v > 0.0f)
+        return (v - dz) / (1.0f - dz);
+    else
+        return (v + dz) / (1.0f - dz);
+}
+
 void parseReport(HidRecord *dev, const BYTE *report, UINT size, int devIndex) {
-    RawState rState = {0};
     if (devIndex < 0 || devIndex >= MAX_CONTROLLERS)
         return;
 
-    // Button control
-    for (USHORT i = 0; i < dev->buttonCapCount; i++) {
-        HIDP_BUTTON_CAPS *bc = &dev->buttonCaps[i];
-        USAGE usages[32];
-        ULONG usageCount = 32;
+    GamepadState *g = &gState[devIndex];
+    g->connected = 1;
 
-        if (HidP_GetUsages(
-                HidP_Input,
-                bc->UsagePage,
-                0,
-                usages,
-                &usageCount,
-                dev->preparsed,
-                (PCHAR)report,
-                size
-            ) != HIDP_STATUS_SUCCESS) {
-            continue;
-        }
+    memset(g->axes, 0, sizeof(g->axes));
+    g->buttons &= ~(
+        (1 << GAMEPAD_BTN_DPAD_UP) |
+        (1 << GAMEPAD_BTN_DPAD_DOWN) |
+        (1 << GAMEPAD_BTN_DPAD_LEFT) |
+        (1 << GAMEPAD_BTN_DPAD_RIGHT)
+    );
 
-        for (ULONG u = 0; u < usageCount; u++) {
-            USAGE usage = usages[u];
-            if (usage < MAX_USAGES) {
-                int btn = dev->buttonMap[usage];
-                if (btn >= 0)
-                    rState.buttonDown[btn] = 1;
-            }
-        }
-    }
-
-    // Axis control
     for (USHORT i = 0; i < dev->valueCapCount; i++) {
         HIDP_VALUE_CAPS *vc = &dev->valueCaps[i];
         LONG value;
@@ -61,53 +47,46 @@ void parseReport(HidRecord *dev, const BYTE *report, UINT size, int devIndex) {
                 &value,
                 dev->preparsed,
                 (PCHAR)report,
-                size
-            ) != HIDP_STATUS_SUCCESS) {
+                size) != HIDP_STATUS_SUCCESS)
+            continue;
+
+        // DPAD (Hat Switch)
+        if (vc->UsagePage == 0x01 && vc->NotRange.Usage == 0x39) {
+            switch (value) {
+                case 0: g->buttons |= (1 << GAMEPAD_BTN_DPAD_UP); break;
+                case 1: g->buttons |= (1 << GAMEPAD_BTN_DPAD_UP) | (1 << GAMEPAD_BTN_DPAD_RIGHT); break;
+                case 2: g->buttons |= (1 << GAMEPAD_BTN_DPAD_RIGHT); break;
+                case 3: g->buttons |= (1 << GAMEPAD_BTN_DPAD_DOWN) | (1 << GAMEPAD_BTN_DPAD_RIGHT); break;
+                case 4: g->buttons |= (1 << GAMEPAD_BTN_DPAD_DOWN); break;
+                case 5: g->buttons |= (1 << GAMEPAD_BTN_DPAD_DOWN) | (1 << GAMEPAD_BTN_DPAD_LEFT); break;
+                case 6: g->buttons |= (1 << GAMEPAD_BTN_DPAD_LEFT); break;
+                case 7: g->buttons |= (1 << GAMEPAD_BTN_DPAD_UP) | (1 << GAMEPAD_BTN_DPAD_LEFT); break;
+                default: break; // neutral
+            }
             continue;
         }
 
-        USAGE usage = vc->NotRange.Usage;
-        if (usage >= MAX_USAGES)
+        // Axes
+        if (vc->UsagePage != 0x01)
             continue;
 
-        int axis = dev->axisMap[usage];
-        if (axis < 0 || axis >= GAMEPAD_MAX_AXES)
+        int axis = vc->NotRange.Usage - 0x30;
+        if (axis < 0 || axis >= AXIS_COUNT)
             continue;
 
-        float norm = 0.0f;
+        float normalized = 0.0f;
         if (vc->LogicalMax != vc->LogicalMin) {
-            norm = (float)(value - vc->LogicalMin) /
-                (float)(vc->LogicalMax - vc->LogicalMin);
-            norm = norm * 2.0f - 1.0f;
+            normalized = (float)(value - vc->LogicalMin) / (float)(vc->LogicalMax - vc->LogicalMin);
+            // Sticks -> -1..1
+            normalized = normalized * 2.0f - 1.0f;
         }
+        // Apply a deadzone to each stick Axes
+        g->axes[AXIS_LX] = applyDeadzone(g->axes[AXIS_LX], 0.2f);
+        g->axes[AXIS_LY] = applyDeadzone(g->axes[AXIS_LY], 0.2f);
+        g->axes[AXIS_RX] = applyDeadzone(g->axes[AXIS_RX], 0.2f);
+        g->axes[AXIS_RY] = applyDeadzone(g->axes[AXIS_RY], 0.2f);
 
-        rState.axisValue[axis] = norm;
-
-        for (USHORT i = 0; i < dev->valueCapCount; i++) {
-            HIDP_VALUE_CAPS *vc = &dev->valueCaps[i];
-
-            printf(
-                "UsagePage 0x%02X Usage 0x%02X | Logical [%ld, %ld]\n",
-                vc->UsagePage,
-                vc->NotRange.Usage,
-                vc->LogicalMin,
-                vc->LogicalMax
-            );
-        }
-    }
-
-    // Update frontend GamepadState directly
-    GamepadState *g = &gState[devIndex];
-    memset(g, 0, sizeof(*g));
-    g->connected = 1;
-
-    for (int i = 0; i < GAMEPAD_BUTTON_COUNT; i++) {
-        if (rState.buttonDown[i])
-            g->buttons |= (1 << i);
-    }
-
-    for (int i = 0; i < GAMEPAD_MAX_AXES; i++) {
-        g->axes[i] = rState.axisValue[i];
+        g->axes[axis] = normalized;
     }
 }
 

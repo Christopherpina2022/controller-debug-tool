@@ -36,59 +36,35 @@ void renderController(ConsoleScreen *screen, const GamepadState *state) {
     toBuffer(screen, 0, 0, "Controller");
     toBuffer(screen, 0, 1, "============");
 
-    sprintf(tempBuffer, "A: %-8s", (state->buttons & BTN_A) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "D-UP: %-8s", (state->buttons & BTN_DPAD_UP) ? "Pressed" : "Released");
     toBuffer(screen, 0, 3, tempBuffer);
 
-    sprintf(tempBuffer, "B: %-8s", (state->buttons & BTN_B) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "D-DOWN: %-8s", (state->buttons & BTN_DPAD_DOWN) ? "Pressed" : "Released");
     toBuffer(screen, 0, 4, tempBuffer);
 
-    sprintf(tempBuffer, "X: %-8s", (state->buttons & BTN_X) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "D-LEFT: %-8s", (state->buttons & BTN_DPAD_LEFT) ? "Pressed" : "Released");
     toBuffer(screen, 0, 5, tempBuffer);
 
-    sprintf(tempBuffer, "Y: %-8s", (state->buttons & BTN_Y) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "D-RIGHT: %-8s", (state->buttons & BTN_DPAD_RIGHT) ? "Pressed" : "Released");
     toBuffer(screen, 0, 6, tempBuffer);
 
-    sprintf(tempBuffer, "RB: %-8s", (state->buttons & BTN_RB) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "LX: %+0.3f", state->axes[AXIS_LX]);
     toBuffer(screen, 0, 8, tempBuffer);
 
-    sprintf(tempBuffer, "LB: %-8s", (state->buttons & BTN_LB) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "LY: %+0.3f", state->axes[AXIS_LY]);
     toBuffer(screen, 0, 9, tempBuffer);
 
-    sprintf(tempBuffer, "SELECT: %-8s", (state->buttons & BTN_BACK) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "RX: %+0.3f", state->axes[AXIS_RX]);
     toBuffer(screen, 0, 11, tempBuffer);
 
-    sprintf(tempBuffer, "START: %-8s", (state->buttons & BTN_START) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "RY: %+0.3f", state->axes[AXIS_RY]);
     toBuffer(screen, 0, 12, tempBuffer);
 
-    sprintf(tempBuffer, "D-UP: %-8s", (state->buttons & BTN_DPAD_UP) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "LT/Z: %+0.3f", state->axes[AXIS_LZ]);
     toBuffer(screen, 0, 14, tempBuffer);
 
-    sprintf(tempBuffer, "D-DOWN: %-8s", (state->buttons & BTN_DPAD_DOWN) ? "Pressed" : "Released");
+    sprintf(tempBuffer, "RT/RZ: %+0.3f", state->axes[AXIS_RZ]);
     toBuffer(screen, 0, 15, tempBuffer);
-
-    sprintf(tempBuffer, "D-LEFT: %-8s", (state->buttons & BTN_DPAD_LEFT) ? "Pressed" : "Released");
-    toBuffer(screen, 0, 16, tempBuffer);
-
-    sprintf(tempBuffer, "D-RIGHT: %-8s", (state->buttons & BTN_DPAD_RIGHT) ? "Pressed" : "Released");
-    toBuffer(screen, 0, 17, tempBuffer);
-
-    sprintf(tempBuffer, "RT: %-8s", (state->axes[AXIS_RT]));
-    toBuffer(screen, 0, 19, tempBuffer);
-
-    sprintf(tempBuffer, "LT: %-8s", (state->axes[AXIS_LT]));
-    toBuffer(screen, 0, 20, tempBuffer);
-
-    sprintf(tempBuffer, "LX: %6d", (state->axes[AXIS_LX]));
-    toBuffer(screen, 0, 22, tempBuffer);
-
-    sprintf(tempBuffer, "LY: %6d", (state->axes[AXIS_LY]));
-    toBuffer(screen, 0, 23, tempBuffer);
-
-    sprintf(tempBuffer, "RX: %6d", (state->axes[AXIS_RX]));
-    toBuffer(screen, 0, 25, tempBuffer);
-
-    sprintf(tempBuffer, "RY: %6d", (state->axes[AXIS_RY]));
-    toBuffer(screen, 0, 26, tempBuffer);
 }
 
 void flushBuffer(ConsoleScreen *screen) {
@@ -141,5 +117,7 @@ int main () {
         renderController(&screen, padState);
         flushBuffer(&screen);
         Sleep(16);
+
+        const GamepadState *pad = input_get_gamepad(0);
     }
 }

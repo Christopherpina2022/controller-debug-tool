@@ -1,17 +1,15 @@
 #include <hidProfiles.h>
 
-void classifyHatSwitch(HidRecord *dev) {
-    // TODO: Map the DPAD
-}
-
 void classifyButtons(HidRecord *dev) {
     // TODO: Map the Buttons
 }
 
-void classifyAxes(HidRecord *dev) {
-    // TODO: Map the Axes then normalize to -1, 1 (0, 1 for triggers)
-}   
-
 void buildHIDMap(HidRecord *dev) {
+    // Clear the maps on startup
+    for (int i = 0; i < MAX_USAGES; i++) {
+        dev->buttonMap[i] = -1;
+        dev->axisMap[i] = -1;
+    }
 
+    classifyButtons(dev);
 }
