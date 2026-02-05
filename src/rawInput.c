@@ -24,7 +24,6 @@ void parseReport(HidRecord *dev, const BYTE *report, UINT size, int devIndex) {
     if (devIndex < 0 || devIndex >= MAX_CONTROLLERS)
         return;
 
-    // Initialize gamepad State pointer in HidRecord Structure
     GamepadState *g = dev->state;
     g->connected = 1;
 
@@ -37,10 +36,31 @@ void parseReport(HidRecord *dev, const BYTE *report, UINT size, int devIndex) {
 
         if (HidP_GetUsageValue(HidP_Input,vc->UsagePage,0,vc->NotRange.Usage,&value,dev->preparsed,(PCHAR)report,size) != HIDP_STATUS_SUCCESS)
             continue;
+            
+        // TODO: Implement reading the SDL values rather than looking by Usage number
+        int usage = vc->NotRange.Usage;
 
-        // run the HID profiler
+        if (usage >= 0 && usage < MAX_USAGES) {
+            int btn = dev->buttonMap[usage];
+            if (btn != HID_MAP_UNUSED && value) {
+                g->buttons |= 1 << btn;
+            }
 
+            int dpad = dev->dpadMap[usage];
+            if (dpad != HID_MAP_UNUSED && value) {
+                g->buttons |= 1 << dpad;
+            }
 
+            int ax = dev->axisMap[usage];
+            if (ax != HID_MAP_UNUSED) {
+                float normalized = 0.0f;
+                if (vc->LogicalMax != vc->LogicalMin) {
+                    normalized = (float)(value - vc->LogicalMin) / (float)(vc->LogicalMax - vc->LogicalMin);
+                    normalized = normalized * 2.0f - 1.0f; // map to -1..1
+                }
+                g->axes[ax] = applyDeadzone(normalized, DEADZONE);
+            }
+        }
     }
 }
 
@@ -81,8 +101,9 @@ HidRecord *devReg(HANDLE hDevice) {
 
     // clear maps
     for (int i = 0; i < MAX_USAGES; i++) {
-        newRecord->buttonMap[i] = -1;
-        newRecord->axisMap[i]   = -1;
+        newRecord->buttonMap[i] = HID_MAP_UNUSED;
+        newRecord->axisMap[i]   = HID_MAP_UNUSED;
+        newRecord->dpadMap[i]   = HID_MAP_UNUSED;
     }
 
     // Get preparsed data
@@ -107,15 +128,12 @@ HidRecord *devReg(HANDLE hDevice) {
 
     HidP_GetValueCaps(HidP_Input, newRecord->valueCaps,
                     &newRecord->valueCapCount, newRecord->preparsed);
-    
-    // Values not mapped by our profile function will show NULL
-    for (int i = 0; i < MAX_USAGES; i++) {
-        newRecord->buttonMap[i] = -1;
-        newRecord->axisMap[i] = -1;
-    }
+
+    // Load game state pointer with our NewRecord values
+    newRecord->state = &gState[hidDevCount - 1];
 
     // Map buttons to our inputs
-    //applyProfile(newRecord);
+    buildHIDMap(newRecord);
 
     return newRecord;
 }

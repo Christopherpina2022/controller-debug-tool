@@ -7,6 +7,7 @@
 
 #define MAX_USAGES 128
 #define HID_MAP_UNUSED -1
+#define DEADZONE 0.15f
 
 // Creates a device record that we call once per device. caps are short for capabilities.
 typedef struct {

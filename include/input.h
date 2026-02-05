@@ -2,9 +2,9 @@
 #include <stdint.h>
 
 #define MAX_CONTROLLERS 4
+#define MAP_UNUSED -1
 
 typedef enum {
-    MAP_UNUSED,
     INPUT_AXIS_LEFT_X,
     INPUT_AXIS_LEFT_Y,
     INPUT_AXIS_RIGHT_X,
@@ -15,7 +15,6 @@ typedef enum {
 } InputAxis;
 
 typedef enum {
-    MAP_UNUSED,
     INPUT_BTN_A,
     INPUT_BTN_B,
     INPUT_BTN_X,
@@ -30,7 +29,6 @@ typedef enum {
 } InputButton;
 
 typedef enum {
-    MAP_UNUSED,
     INPUT_DPAD_UP,
     INPUT_DPAD_DOWN,
     INPUT_DPAD_LEFT,

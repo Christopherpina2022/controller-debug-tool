@@ -39,27 +39,100 @@ InputDpad parseDpadName(const char *s) {
     return MAP_UNUSED;
 }
 
+// Parse 4 hex chars in little-endian to uint16_t
 static uint16_t parseHex(const char *s) {
-    uint16_t value = 0;
-    sscanf(s, "%4hx", &value);
-    return value;
+    if (!s || strlen(s) < 4) return 0;
+    // Read the two bytes separately and swap
+    unsigned int lo, hi;
+    if (sscanf(s, "%2x%2x", &lo, &hi) != 2) return 0;
+    return (uint16_t)((hi << 8) | lo);
 }
 
 void parse_vid_pid(const char *guid, uint16_t *vid, uint16_t *pid) {
-    /* sample SDL GUID standard for future reference: 
-        03000000300f00000a01000000000000
+    if (!guid || strlen(guid) < 32) {
+        *vid = 0;
+        *pid = 0;
+        return;
+    }
 
-        Byte 8 starts the VID (300f), byte 16 starts the PID (0a01)*/
-    *vid = parseHex(guid + 8);
-    *pid = parseHex(guid + 16);
+    *vid = parseHex(guid + 8);   // bytes 8-11
+    *pid = parseHex(guid + 16);  // bytes 16-19
+}
+
+void parseMappingToken(HidRecord *dev, const char *token) {
+    /* SDL tokens are written differently than USB usages ( USAGE: 0x53, 0x30, etc.) 
+    (SDL: "a:b0", "leftx:a1", "dpup:h0.1", etc.). This means for the convenience of
+    not having to map per controller ever manufactured, we will use the SDL naming convention
+    to map our buttons rather than by Usage.*/
+    char logical[32], hid[32];
+    if (sscanf(token, "%31[^:]:%31s", logical, hid) != 2) return;
+
+    // Determine the usage number (the number after b/a/h)
+    int usage = -1;
+    if (hid[0] == 'b' || hid[0] == 'a' || hid[0] == 'h') {
+        usage = atoi(hid + 1);
+        if (usage < 0 || usage >= MAX_USAGES) return;
+    } else {
+        return; // unknown usage type
+    }
+
+    // Map the logical name to the appropriate enum and store in dev
+    InputButton b = parseButtonName(logical);
+    if (b != MAP_UNUSED) {
+        dev->buttonMap[usage] = b;
+        return;
+    }
+
+    InputAxis ax = parseAxisName(logical);
+    if (ax != MAP_UNUSED) {
+        dev->axisMap[usage] = ax;
+        return;
+    }
+
+    InputDpad d = parseDpadName(logical);
+    if (d != MAP_UNUSED) {
+        dev->dpadMap[usage] = d;
+        return;
+    }
+}
+
+
+void readLines(FILE *fp, HidRecord *dev) {
+    /* Not very optimal, but it is a plaintext file and i'd rather do
+    anything else than setup a data dictionary so I can have O(1) complexity
+    for the people testing this app with the Hatsune Miku Sho PS3 Controller*/ 
+
+    char line[512];
+    while (fgets(line, sizeof(line), fp)) {
+        if (line[0] == '#' || line[0] == '\n') continue;
+
+        // Check if this line matches our device
+        uint16_t vid, pid;
+        parse_vid_pid(line, &vid, &pid);
+        if (vid != dev->vendorID || pid != dev->productID) continue;
+
+        // assign as a token when params match
+        char *tokens = strchr(line, ','); // comma after GUID
+        if (!tokens) continue;
+        tokens++;
+
+        // Split by commas or spaces and map each token
+        char *tok = strtok(tokens, ",");
+        while (tok) {
+            parseMappingToken(dev, tok);
+            tok = strtok(NULL, ",");
+        }
+
+        break;
+    }
 }
 
 void buildHIDMap(HidRecord *dev) {
     clearMaps(dev);
-
-    // TODO: Load the game controller DB file
-    //FILE *fp = fopen("gamecontrollerdb.txt");
-    // TODO: search for the line containing our VID/PID via the GUID that prefixes the DB
-    // TODO: Parse the data after the GUID
-    // TODO: Map the controller state based on the parsed data
+    // Load the game controller DB file provided by SDL
+    FILE *fp = fopen("gamecontrollerdb.txt", "r");
+    if (!fp) return;
+    // search for the line containing our VID/PID via the GUID that prefixes the DB
+    readLines(fp, dev);
+    fclose(fp);
 }
