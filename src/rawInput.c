@@ -221,13 +221,44 @@ HidRecord *devReg(HANDLE hDevice) {
         }
     }
 
-    dev->state = &gState[hidDevCount - 1];
+    dev->state = NULL;
+    for (int i = 0; i < MAX_CONTROLLERS; i++) {
+        if (!gState[i].connected) {
+            dev->state = &gState[i];
+            break;
+        }
+    }
     return dev;
 }
 
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
+        case WM_INPUT_DEVICE_CHANGE: {
+            HANDLE hDevice = (HANDLE)lParam;
+
+            if (wParam == GIDC_REMOVAL) {
+                for (int i = 0; i < hidDevCount; i++) {
+                    if (hidRecord[i].device == hDevice) {
+
+                        // Mark state disconnected
+                        hidRecord[i].state->connected = 0;
+
+                        // Free resources
+                        free(hidRecord[i].preparsed);
+                        free(hidRecord[i].buttonCaps);
+                        free(hidRecord[i].valueCaps);
+
+                        // Compact array (swap with last)
+                        hidRecord[i] = hidRecord[hidDevCount - 1];
+                        hidDevCount--;
+
+                        break;
+                    }
+                }
+            }
+            break;
+        }
         case WM_INPUT: {
             BYTE buffer[1024];
             UINT size = 0;
@@ -328,6 +359,9 @@ void rawInit() {
 }
 
 void rawUpdate() {
+    for (int i = 0; i < MAX_CONTROLLERS; i++) {
+        gState[i].connected = 0;
+    }
     MSG msg;
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
